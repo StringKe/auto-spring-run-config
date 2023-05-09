@@ -13,7 +13,8 @@
 		"noImplicitAny": true,
 		"noImplicitReturns": true,
 		"noFallthroughCasesInSwitch": true,
-		"skipDefaultLibCheck": true
+		"skipDefaultLibCheck": true,
+		"resolveJsonModule": true
 	},
 	"include": ["source"],
 	"exclude": ["node_modules", "**/__tests__/*", "**/__mocks__/*"]

@@ -3,14 +3,17 @@ import * as path from 'path';
 import * as xmljs from 'xml-js';
 import {Element} from 'xml-js';
 import * as fs from 'fs';
-import {glob} from 'glob';
+import globby from 'fast-glob';
 import {parse} from 'yaml';
 import {first, get, last, set, startCase, upperFirst} from 'lodash';
 import * as os from "os";
 import findFreePorts from "find-free-ports"
+import * as process from "process";
+import packageJSON from "../package.json";
 
 let usedPorts: number[] = [];
 
+console.log("Version: ", packageJSON.version)
 const isFree = async (port: number) => {
 	if (usedPorts.includes(port)) {
 		return false
@@ -85,13 +88,20 @@ async function valueHook(value: string | null | number | boolean) {
 }
 
 async function bootstrap() {
-	const outputPath = path.join(__dirname, '.run')
+	const outputPath = path.join(process.cwd(), '.run')
+	console.log('outputPath', outputPath)
 
-	const basePath =path.join(__dirname,'tools','run')
+	const basePath = path.join(process.cwd(), 'tools', 'run')
+	console.log('basePath', basePath)
 	const templatedPath = path.join(basePath, 'template.xml');
+	console.log('templatedPath', templatedPath)
 
-	const envsPath = path.join(basePath, 'envs');
-	const envs = glob.sync(path.join(envsPath, '*.yml'));
+	const envsPath = path.join(basePath, 'envs', '*');
+	console.log('envsPath', envsPath)
+	const envs = (await globby(envsPath, {})).filter((env) => {
+		return env.endsWith('.yml') || env.endsWith('.yaml')
+	})
+	console.log('envs', envs)
 
 	if (!fs.existsSync(templatedPath)) {
 		console.error('找不到模板文件', templatedPath);
@@ -99,11 +109,13 @@ async function bootstrap() {
 	}
 
 	const templateString = fs.readFileSync(templatedPath).toString();
+	console.log('templateString', templateString)
 	const template = xmljs.xml2js(templateString);
 
-	const applicationJavas = glob.sync(path.join(__dirname, '**', '*Application.java'), {
-		realpath: true,
-	});
+	const scanFilePath = path.join(process.cwd(), '**', '*Application.java');
+	console.log('scanFilePath', scanFilePath)
+	const applicationJavas = await globby(scanFilePath, {})
+	console.log('applicationJavas', applicationJavas)
 
 	if (!fs.existsSync(outputPath)) {
 		fs.mkdirSync(outputPath);

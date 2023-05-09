@@ -1,7 +1,7 @@
 {
 	"name": "@stringke/auto-spring-run-config",
-	"version": "1.0.8",
-	"bin": "dist/cli.js",
+	"version": "1.0.14",
+	"bin": "dist/source/cli.js",
 	"engines": {
 		"node": ">=16"
 	},
@@ -29,8 +29,8 @@
 	},
 	"dependencies": {
 		"domhandler": "^5.0.3",
+		"fast-glob": "^3.2.12",
 		"find-free-ports": "^3.1.1",
-		"glob": "^10.2.2",
 		"lodash": "^4.17.21",
 		"lodash-es": "^4.17.21",
 		"tslib": "^2.5.0",
