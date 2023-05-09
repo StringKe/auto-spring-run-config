@@ -1,6 +1,6 @@
 {
 	"name": "@stringke/auto-spring-run-config",
-	"version": "1.0.14",
+	"version": "1.0.17",
 	"bin": "dist/source/cli.js",
 	"engines": {
 		"node": ">=16"

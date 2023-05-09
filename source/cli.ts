@@ -3,7 +3,6 @@ import * as path from 'path';
 import * as xmljs from 'xml-js';
 import {Element} from 'xml-js';
 import * as fs from 'fs';
-import globby from 'fast-glob';
 import {parse} from 'yaml';
 import {first, get, last, set, startCase, upperFirst} from 'lodash';
 import * as os from "os";
@@ -22,6 +21,25 @@ const isFree = async (port: number) => {
 	return await findFreePorts.isFreePort(port)
 }
 
+
+function deepGetFile(currentDir: string, fileName: string) {
+	const result: string[] = [];
+	const files = fs.readdirSync(currentDir);
+	files.forEach((item) => {
+		const fPath = path.join(currentDir, item);
+		const stat = fs.statSync(fPath);
+		if (stat.isDirectory()) {
+			result.push(...deepGetFile(fPath, fileName));
+		}
+		if (stat.isFile()) {
+			if (fileName === '*' || item.includes(fileName)) {
+				result.push(fPath);
+			}
+		}
+	});
+	return result;
+}
+
 function getIpv4s() {
 	const interfaces = os.networkInterfaces();
 	const addresses = [];
@@ -36,12 +54,36 @@ function getIpv4s() {
 			}
 		}
 	}
-	return first(addresses.filter((address) => {
+
+	const newAddress = addresses.filter((address) => {
 		if (address.startsWith('127.')) {
 			return false;
 		}
 		return !address.startsWith('198.18');
-	})) || '127.0.0.1';
+	});
+
+	// 排序 ip 把 192.168. 开头的放在前面
+	newAddress.sort((a, b) => {
+		if (a.startsWith('192.168.')) {
+			return -1;
+		}
+		if (b.startsWith('192.168.')) {
+			return 1;
+		}
+		return 0;
+	});
+	// 排序 ip 把 192.168.0. 开头的放在前面
+	newAddress.sort((a, b) => {
+		if (a.startsWith('192.168.0.')) {
+			return -1;
+		}
+		if (b.startsWith('192.168.0.')) {
+			return 1;
+		}
+		return 0;
+	});
+
+	return first(newAddress) || '127.0.0.1';
 }
 
 
@@ -96,9 +138,9 @@ async function bootstrap() {
 	const templatedPath = path.join(basePath, 'template.xml');
 	console.log('templatedPath', templatedPath)
 
-	const envsPath = path.join(basePath, 'envs', '*');
+	const envsPath = path.join(basePath, 'envs');
 	console.log('envsPath', envsPath)
-	const envs = (await globby(envsPath, {})).filter((env) => {
+	const envs = (deepGetFile(envsPath, "*")).filter((env) => {
 		return env.endsWith('.yml') || env.endsWith('.yaml')
 	})
 	console.log('envs', envs)
@@ -112,9 +154,9 @@ async function bootstrap() {
 	console.log('templateString', templateString)
 	const template = xmljs.xml2js(templateString);
 
-	const scanFilePath = path.join(process.cwd(), '**', '*Application.java');
+	const scanFilePath = process.cwd();
 	console.log('scanFilePath', scanFilePath)
-	const applicationJavas = await globby(scanFilePath, {})
+	const applicationJavas = deepGetFile(scanFilePath, 'Application.java');
 	console.log('applicationJavas', applicationJavas)
 
 	if (!fs.existsSync(outputPath)) {
