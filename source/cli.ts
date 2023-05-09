@@ -86,7 +86,7 @@ function extractPackageName(path: string): string | null {
 	// 移除 path 中 process.cwd() 部分
 	path = path.replace(process.cwd(), '');
 	// 将路径中的反斜杠转换为正斜杠
-	path = path.replace(/\\/g, '/');
+	path = path.replace(/\\/g, '/').split('/').filter((item) => item !== '').join('/');
 
 	// 匹配路径中的 Java 包名部分
 	const match = path.match(/.*\/src\/(main|test)\/java\/(.*)\/.*$/);
@@ -104,7 +104,7 @@ function extractGradleProjectName(path: string): string | null {
 	// 移除 path 中 process.cwd() 部分
 	path = path.replace(process.cwd(), '');
 	// 将路径中的反斜杠转换为正斜杠
-	path = path.replace(/\\/g, '/');
+	path = path.replace(/\\/g, '/').split('/').filter((item) => item !== '').join('/');
 	const match = path
 		.replace(/\/src\/.*/, '')
 		.split('/')
