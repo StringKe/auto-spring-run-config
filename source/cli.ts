@@ -15,6 +15,7 @@ const isFree = async (port: number) => {
 	if (usedPorts.includes(port)) {
 		return false
 	}
+	usedPorts.push(port)
 	return await findFreePorts.isFreePort(port)
 }
 
