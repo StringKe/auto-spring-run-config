@@ -85,9 +85,9 @@ async function valueHook(value: string | null | number | boolean) {
 }
 
 async function bootstrap() {
-	const outputPath = './.run';
+	const outputPath = path.join(__dirname, '.run')
 
-	const basePath = './tools/run';
+	const basePath =path.join(__dirname,'tools','run')
 	const templatedPath = path.join(basePath, 'template.xml');
 
 	const envsPath = path.join(basePath, 'envs');
@@ -101,7 +101,7 @@ async function bootstrap() {
 	const templateString = fs.readFileSync(templatedPath).toString();
 	const template = xmljs.xml2js(templateString);
 
-	const applicationJavas = glob.sync(path.join('./', '**', '*Application.java'), {
+	const applicationJavas = glob.sync(path.join(__dirname, '**', '*Application.java'), {
 		realpath: true,
 	});
 
