@@ -4,6 +4,9 @@ dependencies:
   domhandler:
     specifier: ^5.0.3
     version: 5.0.3
+  find-free-ports:
+    specifier: ^3.1.1
+    version: 3.1.1
   glob:
     specifier: ^10.2.2
     version: 10.2.2
@@ -239,6 +242,10 @@ packages:
 
   /emoji-regex@9.2.2:
     resolution: {integrity: sha512-L18DaJsXSUk2+42pv8mLs5jJT2hqFkFE4j21wOmgbUqsZ2hL72NsUU785g9RXgo3s0ZNgVl42TiHp3ZtOv/Vyg==}
+    dev: false
+
+  /find-free-ports@3.1.1:
+    resolution: {integrity: sha512-hQebewth9i5qkf0a0u06iFaxQssk5ZnPBBggsa1vk8zCYaZoz9IZXpoRLTbEOrYdqfrjvcxU00gYoCPgmXugKA==}
     dev: false
 
   /foreground-child@3.1.1:

@@ -1,30 +1,36 @@
 #!/usr/bin/env node
 import * as path from 'path';
 import * as xmljs from 'xml-js';
+import {Element} from 'xml-js';
 import * as fs from 'fs';
 import {glob} from 'glob';
 import {parse} from 'yaml';
-import {get, last, set, upperFirst, startCase} from 'lodash';
-import {Element} from 'xml-js';
+import {first, get, last, set, startCase, upperFirst} from 'lodash';
+import * as os from "os";
+import findFreePorts from "find-free-ports"
 
-const outputPath = './.run';
-
-const basePath = './tools/run';
-const templatedPath = path.join(basePath, 'template.xml');
-
-const envsPath = path.join(basePath, 'envs');
-const envs = glob.sync(path.join(envsPath, '*.yml'));
-
-const templateString = fs.readFileSync(templatedPath).toString();
-const template = xmljs.xml2js(templateString);
-
-const applicationJavas = glob.sync(path.join('./', '**', '*Application.java'), {
-	realpath: true,
-});
-
-if (!fs.existsSync(outputPath)) {
-	fs.mkdirSync(outputPath);
+function getIpv4s() {
+	const interfaces = os.networkInterfaces();
+	const addresses = [];
+	for (const k in interfaces) {
+		const kind2 = get(interfaces, k);
+		if (kind2) {
+			for (const k2 in kind2) {
+				const address = get(kind2, k2);
+				if (address && address.family === 'IPv4' && !address.internal) {
+					addresses.push(address.address);
+				}
+			}
+		}
+	}
+	return first(addresses.filter((address) => {
+		if (address.startsWith('127.')) {
+			return false;
+		}
+		return !address.startsWith('198.18');
+	})) || '127.0.0.1';
 }
+
 
 function extractPackageName(path: string): string | null {
 	// 将路径中的反斜杠转换为正斜杠
@@ -52,113 +58,162 @@ function extractGradleProjectName(path: string): string | null {
 	return `parent.${match}.main`;
 }
 
-applicationJavas.map(applicationJava => {
-	const fileName = path.basename(applicationJava);
-	const packageName = extractPackageName(applicationJava);
-	const gradleProjectName = extractGradleProjectName(applicationJava);
-	if (!packageName || !gradleProjectName) {
-		console.error('无法解析包名', applicationJava);
+async function valueHook(value: string) {
+	if (value.startsWith("HOOK")) {
+		if (value.startsWith("HOOK_IP")) {
+			return getIpv4s();
+
+		} else if (value.startsWith("HOOK_PORT")) {
+			return first(await findFreePorts(1, {
+				startPort: 10000,
+				endPort: 30000,
+			})) || value.replace("HOOK_PORT", "");
+		}
+	}
+	return value;
+}
+
+async function bootstrap() {
+	const outputPath = './.run';
+
+	const basePath = './tools/run';
+	const templatedPath = path.join(basePath, 'template.xml');
+
+	const envsPath = path.join(basePath, 'envs');
+	const envs = glob.sync(path.join(envsPath, '*.yml'));
+
+	if (!fs.existsSync(templatedPath)) {
+		console.error('找不到模板文件', templatedPath);
 		return;
 	}
 
-	const appName = last(
-		gradleProjectName.replace('parent.', '').replace('.main', '').split('.'),
-	);
+	const templateString = fs.readFileSync(templatedPath).toString();
+	const template = xmljs.xml2js(templateString);
 
-	if (!appName) {
-		console.error(
-			`无法解析应用名 ${gradleProjectName} ${applicationJava} ${packageName} ${appName} ${fileName} ${applicationJava}`,
-		);
-		return;
+	const applicationJavas = glob.sync(path.join('./', '**', '*Application.java'), {
+		realpath: true,
+	});
+
+	if (!fs.existsSync(outputPath)) {
+		fs.mkdirSync(outputPath);
 	}
 
-	for (const env of envs) {
-		const envName = upperFirst(path.basename(env).replace('.yml', ''));
-		const currentName = startCase(`${appName}${envName}`).split(' ').join('');
-		const currentTemplate = JSON.parse(JSON.stringify(template)) as Element;
+	const all = applicationJavas.map(async (applicationJava) => {
+		const fileName = path.basename(applicationJava);
+		const packageName = extractPackageName(applicationJava);
+		const gradleProjectName = extractGradleProjectName(applicationJava);
+		if (!packageName || !gradleProjectName) {
+			console.error('无法解析包名', applicationJava);
+			return;
+		}
 
-		set(
-			currentTemplate,
-			'elements[0].elements[0].attributes.name',
-			currentName,
+		const appName = last(
+			gradleProjectName.replace('parent.', '').replace('.main', '').split('.'),
 		);
 
-		const envDocument = parse(fs.readFileSync(env).toString());
+		if (!appName) {
+			console.error(
+				`无法解析应用名 ${gradleProjectName} ${applicationJava} ${packageName} ${appName} ${fileName} ${applicationJava}`,
+			);
+			return;
+		}
 
-		const envElement: Element = {
-			attributes: {},
-			cdata: '',
-			comment: '',
-			declaration: {},
-			doctype: '',
-			elements: [],
-			instruction: '',
-			name: 'envs',
-			text: undefined,
-			type: 'element',
-		};
-		Object.keys(envDocument).map(key => {
-			const value = get(envDocument, key);
-			envElement.elements?.push({
-				attributes: {
-					name: key,
-					value: value,
-				},
+		for (const env of envs) {
+			const envName = upperFirst(path.basename(env).replace('.yml', ''));
+			const currentName = startCase(`${appName}${envName}`).split(' ').join('');
+			const currentTemplate = JSON.parse(JSON.stringify(template)) as Element;
+
+			set(
+				currentTemplate,
+				'elements[0].elements[0].attributes.name',
+				currentName,
+			);
+
+			const envDocument = parse(fs.readFileSync(env).toString());
+
+			const envElement: Element = {
+				attributes: {},
 				cdata: '',
 				comment: '',
 				declaration: {},
 				doctype: '',
 				elements: [],
 				instruction: '',
-				name: 'env',
+				name: 'envs',
 				text: undefined,
 				type: 'element',
-			} as Element);
-		});
+			};
+			const allowed = Object.keys(envDocument).map(async (key) => {
+				const value = await valueHook(get(envDocument, key));
 
-		const key = 'elements[0].elements[0].elements';
-		const elements = get(currentTemplate, key, []);
-		set(currentTemplate, key, [envElement, ...elements]);
 
-		const findSpringMainClassOptions = get(currentTemplate, key, []).findIndex(
-			(element: Element) => {
-				return (
-					element.name === 'option' &&
-					get(element, 'attributes.name') === 'SPRING_BOOT_MAIN_CLASS'
-				);
-			},
-		);
-		if (findSpringMainClassOptions === -1) {
-			console.error('无法找到 Spring Boot Main Class');
-			return;
+				envElement.elements?.push({
+					attributes: {
+						name: key,
+						value: value,
+					},
+					cdata: '',
+					comment: '',
+					declaration: {},
+					doctype: '',
+					elements: [],
+					instruction: '',
+					name: 'env',
+					text: undefined,
+					type: 'element',
+				} as Element);
+			});
+
+			await Promise.all(allowed);
+
+			const key = 'elements[0].elements[0].elements';
+			const elements = get(currentTemplate, key, []);
+			set(currentTemplate, key, [envElement, ...elements]);
+
+			const findSpringMainClassOptions = get(currentTemplate, key, []).findIndex(
+				(element: Element) => {
+					return (
+						element.name === 'option' &&
+						get(element, 'attributes.name') === 'SPRING_BOOT_MAIN_CLASS'
+					);
+				},
+			);
+			if (findSpringMainClassOptions === -1) {
+				console.error('无法找到 Spring Boot Main Class');
+				return;
+			}
+			const optionKey = `${key}[${findSpringMainClassOptions}]`;
+			set(
+				currentTemplate,
+				`${optionKey}.attributes.value`,
+				`${packageName}.${fileName.replace('.java', '')}`,
+			);
+
+			const findModule = get(currentTemplate, key, []).findIndex(
+				(element: Element) => {
+					return element.name === 'module';
+				},
+			);
+			if (findModule === -1) {
+				console.error('无法找到 module');
+				return;
+			}
+			const moduleKey = `${key}[${findModule}]`;
+			set(currentTemplate, `${moduleKey}.attributes.name`, gradleProjectName);
+
+			const outputFileName = `${currentName}.run.xml`;
+			const outputFullPath = path.join(outputPath, outputFileName);
+
+			console.log('输出', outputFullPath);
+
+			fs.writeFileSync(
+				outputFullPath,
+				xmljs.js2xml(currentTemplate, {compact: false, spaces: 4}),
+			);
 		}
-		const optionKey = `${key}[${findSpringMainClassOptions}]`;
-		set(
-			currentTemplate,
-			`${optionKey}.attributes.value`,
-			`${packageName}.${fileName.replace('.java', '')}`,
-		);
+	});
 
-		const findModule = get(currentTemplate, key, []).findIndex(
-			(element: Element) => {
-				return element.name === 'module';
-			},
-		);
-		if (findModule === -1) {
-			console.error('无法找到 module');
-			return;
-		}
-		const moduleKey = `${key}[${findModule}]`;
-		set(currentTemplate, `${moduleKey}.attributes.name`, gradleProjectName);
+	await Promise.all(all);
+}
 
-		const outputFileName = `${currentName}.run.xml`;
-		const outputFullPath = path.join(outputPath, outputFileName);
-
-		console.log('输出', outputFullPath);
-
-		fs.writeFileSync(
-			outputFullPath,
-			xmljs.js2xml(currentTemplate, {compact: false, spaces: 4}),
-		);
-	}
-});
+void bootstrap();
