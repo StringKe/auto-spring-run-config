@@ -9,6 +9,15 @@ import {first, get, last, set, startCase, upperFirst} from 'lodash';
 import * as os from "os";
 import findFreePorts from "find-free-ports"
 
+let usedPorts: number[] = [];
+
+const isFree = async (port: number) => {
+	if (usedPorts.includes(port)) {
+		return false
+	}
+	return await findFreePorts.isFreePort(port)
+}
+
 function getIpv4s() {
 	const interfaces = os.networkInterfaces();
 	const addresses = [];
@@ -67,6 +76,7 @@ async function valueHook(value: string | null | number | boolean) {
 			return first(await findFreePorts(1, {
 				startPort: 10000,
 				endPort: 30000,
+				isFree,
 			})) || value.toString().replace("HOOK_PORT", "");
 		}
 	}
@@ -145,7 +155,6 @@ async function bootstrap() {
 			};
 			const allowed = Object.keys(envDocument).map(async (key) => {
 				const value = await valueHook(get(envDocument, key));
-
 
 				envElement.elements?.push({
 					attributes: {
