@@ -58,16 +58,16 @@ function extractGradleProjectName(path: string): string | null {
 	return `parent.${match}.main`;
 }
 
-async function valueHook(value: string) {
-	if (value.startsWith("HOOK")) {
-		if (value.startsWith("HOOK_IP")) {
+async function valueHook(value: string | null | number | boolean) {
+	if (value && value.toString().startsWith("HOOK")) {
+		if (value.toString().startsWith("HOOK_IP")) {
 			return getIpv4s();
 
-		} else if (value.startsWith("HOOK_PORT")) {
+		} else if (value.toString().startsWith("HOOK_PORT")) {
 			return first(await findFreePorts(1, {
 				startPort: 10000,
 				endPort: 30000,
-			})) || value.replace("HOOK_PORT", "");
+			})) || value.toString().replace("HOOK_PORT", "");
 		}
 	}
 	return value;
