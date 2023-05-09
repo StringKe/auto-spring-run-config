@@ -10,9 +10,14 @@ import findFreePorts from "find-free-ports"
 import * as process from "process";
 import packageJSON from "../package.json";
 
-let usedPorts: number[] = [];
+
+const yargs = require('yargs/yargs')
+const {hideBin} = require('yargs/helpers')
+const argv = yargs(hideBin(process.argv)).argv
 
 console.log("Version: ", packageJSON.version)
+
+let usedPorts: number[] = [];
 const isFree = async (port: number) => {
 	if (usedPorts.includes(port)) {
 		return false
@@ -62,32 +67,24 @@ function getIpv4s() {
 		return !address.startsWith('198.18');
 	});
 
-	// 排序 ip 把 192.168. 开头的放在前面
+	// 将 192.168.0 开头的地址放到最前面
 	newAddress.sort((a, b) => {
-		if (a.startsWith('192.168.')) {
+		if (a.startsWith('192.168.0') && !b.startsWith('192.168.0')) {
 			return -1;
 		}
-		if (b.startsWith('192.168.')) {
-			return 1;
-		}
-		return 0;
-	});
-	// 排序 ip 把 192.168.0. 开头的放在前面
-	newAddress.sort((a, b) => {
-		if (a.startsWith('192.168.0.')) {
-			return -1;
-		}
-		if (b.startsWith('192.168.0.')) {
+		if (!a.startsWith('192.168.0') && b.startsWith('192.168.0')) {
 			return 1;
 		}
 		return 0;
 	});
 
-	return first(newAddress) || '127.0.0.1';
+	return get(argv, "ip") || first(newAddress) || '127.0.0.1';
 }
 
 
 function extractPackageName(path: string): string | null {
+	// 移除 path 中 process.cwd() 部分
+	path = path.replace(process.cwd(), '');
 	// 将路径中的反斜杠转换为正斜杠
 	path = path.replace(/\\/g, '/');
 
@@ -104,6 +101,8 @@ function extractPackageName(path: string): string | null {
 }
 
 function extractGradleProjectName(path: string): string | null {
+	// 移除 path 中 process.cwd() 部分
+	path = path.replace(process.cwd(), '');
 	// 将路径中的反斜杠转换为正斜杠
 	path = path.replace(/\\/g, '/');
 	const match = path
@@ -120,7 +119,7 @@ async function valueHook(value: string | null | number | boolean) {
 
 		} else if (value.toString().startsWith("HOOK_PORT")) {
 			return first(await findFreePorts(1, {
-				startPort: 10000,
+				startPort: 20000,
 				endPort: 30000,
 				isFree,
 			})) || value.toString().replace("HOOK_PORT", "");

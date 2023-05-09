@@ -1,6 +1,6 @@
 {
 	"name": "@stringke/auto-spring-run-config",
-	"version": "1.0.17",
+	"version": "1.0.21",
 	"bin": "dist/source/cli.js",
 	"engines": {
 		"node": ">=16"
@@ -35,7 +35,8 @@
 		"lodash-es": "^4.17.21",
 		"tslib": "^2.5.0",
 		"xml-js": "^1.6.11",
-		"yaml": "^2.2.2"
+		"yaml": "^2.2.2",
+		"yargs": "^17.7.2"
 	},
 	"devDependencies": {
 		"@sindresorhus/tsconfig": "^3.0.1",
